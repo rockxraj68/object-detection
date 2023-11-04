@@ -3,6 +3,7 @@ import argparse
 import glob
 from ultralytics import YOLO
 import cv2
+import numpy as np
 
 SEG_MODEL_YAML = 'YOLOv8s-seg.yaml'
 
@@ -51,7 +52,7 @@ class DetectionModel:
 
         img = cv2.imread(image_path)
         H, W, _ = img.shape
-
+        breakpoint()
         for result in results:
             for j, mask in enumerate(result.masks.data):
                 mask = mask.numpy() * 255
@@ -59,6 +60,44 @@ class DetectionModel:
                 cv2.imshow('output.png', mask)
                 if cv2.waitKey(0):
                     break
+    def perform_detection(self):
+        # Perform object detection on an image using the model
+        validated_model_path = self.get_last_model('best.pt')
+        model = YOLO(validated_model_path)
+        image_path = 'test/images/171_jpg.rf.6a7e484ddb8e6035d2a5b011feecd630.jpg'
+        #results = model(image_path)
+        results = model.predict(source=image_path,save=False, save_txt=False)
+        print('result =>', results)
+        result = results[0]
+        img = cv2.imread(image_path)
+        #img = cv2.resize(img, None, fx=0.7, fy=0.7)
+        H, W, _ = img.shape
+        segmentation_contours_idx = []
+        for seg in result.masks.xy:
+            # #contours
+            # seg[:,0] *= W
+            # seg[:,1] *= H
+            segment = np.array(seg, dtype=np.int32)
+            segmentation_contours_idx.append(segment)
+
+        bboxes = np.array(result.boxes.xyxy.cpu(), dtype=int)
+
+        # get classIds
+        class_ids = np.array(result.boxes.cls.cpu(), dtype=int)
+
+        # get confidence
+        scores = np.array(result.boxes.conf.cpu(), dtype=float).round(2)
+
+        for bbox, class_id, seg, score in zip(bboxes, class_ids, segmentation_contours_idx, scores):
+
+            #print("bbox =", bbox, "class_id=", class_id, "seg=", seg, "score =", score )
+            x, y, x2, y2 = bbox
+            print(x, y, x2, y2)
+            cv2.rectangle(img, (x,y), (x2,y2), (0, 0, 255), 2)
+            cv2.polylines(img, [seg], True, (255, 0, 0), 2)
+            cv2.imshow("image", img)
+            if cv2.waitKey(0):
+                break
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Process some value.')
