@@ -9,7 +9,7 @@ SEG_MODEL_YAML = 'YOLOv8s-seg.yaml'
 RATIO_PIXEL_TO_CM = 78 # 78pxixel for 1 cm
 RATIO_PIXEL_TO_CM_SQUARE = RATIO_PIXEL_TO_CM * RATIO_PIXEL_TO_CM
 COLOR = list(np.random.random(size=3) * 256)
-
+CLASS = ['Apple', 'Banana', 'Orange']
 class DetectionModel:
     def __init__(self):
         # Create a new YOLO model from scratch
@@ -45,14 +45,11 @@ class DetectionModel:
         validation_model = self.get_last_model('best.pt')
         results = YOLO(validation_model).val()
 
-    def perform_detection(self):
+    def perform_masking(self, image_path = 'test/images/171_jpg.rf.6a7e484ddb8e6035d2a5b011feecd630.jpg'):
         # Perform object detection on an image using the model
         validated_model_path = self.get_last_model('best.pt')
         model = YOLO(validated_model_path)
-        image_path = 'test/images/171_jpg.rf.6a7e484ddb8e6035d2a5b011feecd630.jpg'
         results = model(image_path)
-        print('result =>', results)
-
         img = cv2.imread(image_path)
         H, W, _ = img.shape
         breakpoint()
@@ -63,26 +60,22 @@ class DetectionModel:
                 cv2.imshow('output.png', mask)
                 if cv2.waitKey(0):
                     break
-    def perform_detection(self):
+
+    def perform_detection(self, image_path = 'test/images/290_jpg.rf.b74138e185b065ea602fc8ce3c6f3b64.jpg'):
         # Perform object detection on an image using the model
         validated_model_path = self.get_last_model('best.pt')
         model = YOLO(validated_model_path)
-        image_path = 'test/images/290_jpg.rf.b74138e185b065ea602fc8ce3c6f3b64.jpg'
-        #results = model(image_path)
-        results = model.predict(source=image_path,save=False, save_txt=False)
+        results = model(image_path)
+        #results = model.predict(source=image_path,save=False, save_txt=False)
         print('result =>', results)
         result = results[0]
         img = cv2.imread(image_path)
-        #img = cv2.resize(img, None, fx=0.7, fy=0.7)
-        H, W, _ = img.shape
         segmentation_contours_idx = []
         for seg in result.masks.xy:
-            # #contours
-            # seg[:,0] *= W
-            # seg[:,1] *= H
+            #contours
             segment = np.array(seg, dtype=np.int32)
             segmentation_contours_idx.append(segment)
-
+        
         bboxes = np.array(result.boxes.xyxy.cpu(), dtype=int)
 
         # get classIds
@@ -101,7 +94,7 @@ class DetectionModel:
             #calculate area size
             area_px = cv2.contourArea(seg)
             area_cm = round(area_px / RATIO_PIXEL_TO_CM_SQUARE, 2)
-            cv2.putText(img, f"Class {class_id}", (x, y-24), cv2.FONT_HERSHEY_PLAIN, 1, COLOR[class_id], 2)
+            cv2.putText(img, f"{CLASS[class_id]}", (x, y-24), cv2.FONT_HERSHEY_PLAIN, 1, COLOR[class_id], 2)
             cv2.putText(img, f"Score {score}", (x, y-12), cv2.FONT_HERSHEY_PLAIN, 1, COLOR[class_id], 2)
             cv2.putText(img, f"Area {area_cm} cm", (x, y), cv2.FONT_HERSHEY_PLAIN, 1, COLOR[class_id], 2)
 
@@ -112,23 +105,25 @@ class DetectionModel:
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Process some value.')
     parser.add_argument('--model', help='A Yolo Model yaml file, example- yolov8n.yaml')
-
     parser.add_argument('--train', help='A coco.yaml file, example- data.yaml')
-
     parser.add_argument('--epochs', help='Number of Epochs for training, example- 100')
-
     parser.add_argument('--validate', help='Validate the yolo model, example- yolov8n.pt')
+    parser.add_argument('--perform_detection', help='')
+    parser.add_argument('--image_path', help='pass image path and model file')
 
-    parser.add_argument('--perform_detection', help='pass image path and model file')
 
     args = parser.parse_args()
-    d = DetectionModel()
     if args.train == 'true':
         if not args.epochs:
             raise Exception ('Epochs size required with train args, hint: --epochs=100')
+        d = DetectionModel()
         d.train_model(int(args.epochs))
     elif args.validate == 'true':
-        print("under validate")
+        d = DetectionModel()
         d.validate_model()
     elif args.perform_detection == 'true':
-        d.perform_detection()
+        d = DetectionModel()
+        if args.image_path:
+            d.perform_detection(image_path=args.image_path)
+        else:
+            d.perform_detection()
