@@ -6,6 +6,9 @@ import cv2
 import numpy as np
 
 SEG_MODEL_YAML = 'YOLOv8s-seg.yaml'
+RATIO_PIXEL_TO_CM = 78 # 78pxixel for 1 cm
+RATIO_PIXEL_TO_CM_SQUARE = RATIO_PIXEL_TO_CM * RATIO_PIXEL_TO_CM
+COLOR = list(np.random.random(size=3) * 256)
 
 class DetectionModel:
     def __init__(self):
@@ -64,7 +67,7 @@ class DetectionModel:
         # Perform object detection on an image using the model
         validated_model_path = self.get_last_model('best.pt')
         model = YOLO(validated_model_path)
-        image_path = 'test/images/171_jpg.rf.6a7e484ddb8e6035d2a5b011feecd630.jpg'
+        image_path = 'test/images/290_jpg.rf.b74138e185b065ea602fc8ce3c6f3b64.jpg'
         #results = model(image_path)
         results = model.predict(source=image_path,save=False, save_txt=False)
         print('result =>', results)
@@ -87,14 +90,21 @@ class DetectionModel:
 
         # get confidence
         scores = np.array(result.boxes.conf.cpu(), dtype=float).round(2)
-
-        for bbox, class_id, seg, score in zip(bboxes, class_ids, segmentation_contours_idx, scores):
+        for bbox, class_id, seg, score, in zip(bboxes, class_ids, segmentation_contours_idx, scores):
 
             #print("bbox =", bbox, "class_id=", class_id, "seg=", seg, "score =", score )
             x, y, x2, y2 = bbox
             print(x, y, x2, y2)
             cv2.rectangle(img, (x,y), (x2,y2), (0, 0, 255), 2)
-            cv2.polylines(img, [seg], True, (255, 0, 0), 2)
+            cv2.polylines(img, [seg], True, COLOR[class_id], 2)
+
+            #calculate area size
+            area_px = cv2.contourArea(seg)
+            area_cm = round(area_px / RATIO_PIXEL_TO_CM_SQUARE, 2)
+            cv2.putText(img, f"Class {class_id}", (x, y-24), cv2.FONT_HERSHEY_PLAIN, 1, COLOR[class_id], 2)
+            cv2.putText(img, f"Score {score}", (x, y-12), cv2.FONT_HERSHEY_PLAIN, 1, COLOR[class_id], 2)
+            cv2.putText(img, f"Area {area_cm} cm", (x, y), cv2.FONT_HERSHEY_PLAIN, 1, COLOR[class_id], 2)
+
             cv2.imshow("image", img)
             if cv2.waitKey(0):
                 break
